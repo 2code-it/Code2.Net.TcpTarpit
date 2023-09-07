@@ -4,7 +4,7 @@ Tarpit services to slowly send data to incoming tcp connections.
 ## Service Options
 - string? **ListenAddress**, listener ip address
 - ushort **PortRangeBegin**, start tcp port number
-- ushort **PortRangeEnd**, end tcp port number, or for 1 listener the as begin
+- ushort **PortRangeEnd**, end tcp port number, or for 1 listener the same as begin
 - bool **UseIPv4Only**, defaults to both ipv4 and ipv6, set to true for ipv4 only
 - int **WriteIntervalInMs**, data send interval
 - int **WriteSize**, the amount of bytes to send per interval
