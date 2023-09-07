@@ -69,7 +69,7 @@ Service started with listeners 90
 Service stopped.
 ```
 
-UseIPv4Only=fasle
+UseIPv4Only=false
 ```
 Service started with listeners 90
 [::ffff:192.168.2.23]:53728      24      890123
