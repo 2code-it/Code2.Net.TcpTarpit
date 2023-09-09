@@ -3,8 +3,7 @@ Tarpit services to slowly send data to incoming tcp connections.
 
 ## Service Options
 - string? **ListenAddress**, listener ip address
-- ushort **PortRangeBegin**, start tcp port number
-- ushort **PortRangeEnd**, end tcp port number, or for 1 listener the same as begin
+- string? **Ports**, comma seperated list of ports and port ranges
 - bool **UseIPv4Only**, defaults to both ipv4 and ipv6, set to true for ipv4 only
 - int **WriteIntervalInMs**, data send interval
 - int **WriteSize**, the amount of bytes to send per interval
@@ -16,13 +15,12 @@ Tarpit services to slowly send data to incoming tcp connections.
 ## Example
 ```
 using Code2.Net.TcpTarpit;
-
+using System.Text;
 
 var options = new TarpitServiceOptions
 {
 	ListenAddress = "192.168.2.23",
-	PortRangeBegin = 10,
-	PortRangeEnd = 99,
+	Ports = "10-99",
 	UseIPv4Only = true,
 	WriteIntervalInMs = 200,
 	WriteSize = 6,
@@ -37,7 +35,7 @@ service.Start();
 service.ConnectionsUpdated += (sender, args) =>
 {
 	string[] lines = args.Connections.Select(x => $"{x.RemoteEndPoint}\t{x.BytesSent}\t{Encoding.UTF8.GetString(x.Buffer)}").ToArray();
-	foreach(var line in lines)
+	foreach (var line in lines)
 	{
 		Console.WriteLine(line);
 	}
@@ -61,17 +59,6 @@ ConnectionsUpdated event it gets removed from the active connections list.
 Program output:
 ```
 Service started with listeners 90
-192.168.2.23:53565       6       012345
-192.168.2.23:53566       6       012345
-192.168.2.23:53565       24      890123
-192.168.2.23:53566       42      678901
-192.168.2.23:53566       54      890123
-Service stopped.
-```
-
-UseIPv4Only=false
-```
-Service started with listeners 90
 [::ffff:192.168.2.23]:53728      24      890123
 [::ffff:192.168.2.23]:53729      24      890123
 [::ffff:192.168.2.23]:53729      54      890123
@@ -81,8 +68,19 @@ Service started with listeners 90
 Service stopped.
 ```
 
+UseIPv4Only=false
+```
+Service started with listeners 90
+192.168.2.23:53565       6       012345
+192.168.2.23:53566       6       012345
+192.168.2.23:53565       24      890123
+192.168.2.23:53566       42      678901
+192.168.2.23:53566       54      890123
+Service stopped.
+```
+
 ## Remarks
-Each connection has a unique id.  
+Each connection has an unique id.  
 ConnectionsUpdated event timing vary when UpdateIntervalInSeconds is not a 
 multiple of WriteIntervalInMs.  
 When the service stops it will complete active connections and send a last
