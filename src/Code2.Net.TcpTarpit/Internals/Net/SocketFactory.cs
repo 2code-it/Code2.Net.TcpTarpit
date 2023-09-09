@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using net = System.Net.Sockets;
+﻿using net = System.Net.Sockets;
 
 namespace Code2.Net.TcpTarpit.Internals.Net
 {

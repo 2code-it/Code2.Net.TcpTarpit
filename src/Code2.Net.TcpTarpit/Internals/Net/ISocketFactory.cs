@@ -1,6 +1,4 @@
-﻿using System.Net.Sockets;
-
-namespace Code2.Net.TcpTarpit.Internals.Net
+﻿namespace Code2.Net.TcpTarpit.Internals.Net
 {
 	internal interface ISocketFactory
 	{

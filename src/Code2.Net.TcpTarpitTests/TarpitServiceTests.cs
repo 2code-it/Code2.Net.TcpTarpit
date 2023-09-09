@@ -1,11 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Code2.Net.TcpTarpit;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Code2.Net.TcpTarpit.Internals.Net;
+﻿using Code2.Net.TcpTarpit.Internals.Net;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 using System.Net;
 
@@ -21,7 +15,7 @@ namespace Code2.Net.TcpTarpit.Tests
 		private List<AsyncCallback> _asyncCallbacks = new List<AsyncCallback>();
 		private IByteReader _byteReader = default!;
 		private IByteReaderFactory _byteReaderFactory = default!;
-		private object _lock = new ();
+		private object _lock = new();
 
 		[TestMethod]
 		public void Start_When_OptionsInvalidWithErrorHandler_Expect_ReturnsNegative1()
@@ -35,6 +29,21 @@ namespace Code2.Net.TcpTarpit.Tests
 			int result = tarpitService.Start();
 
 			Assert.AreEqual(-1, result);
+		}
+
+		[TestMethod]
+		public void Start_When_OptionsPortsInvalidWithErrorHandler_Expect_ReturnsListenerCount()
+		{
+			ResetSubstitutes();
+			var options = TarpitService.GetDefaultOptions();
+			options.ListenAddress = "0.0.0.0";
+			options.Ports = "21-30,a,35,36";
+			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
+			tarpitService.Error += (s, e) => { };
+
+			int result = tarpitService.Start();
+
+			Assert.AreEqual(12, result);
 		}
 
 		[TestMethod]
@@ -54,11 +63,10 @@ namespace Code2.Net.TcpTarpit.Tests
 		{
 			ResetSubstitutes();
 			var options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 1;
-			options.PortRangeEnd = 100;
+			options.Ports = "1-100";
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
 
-			int result  = tarpitService.Start();
+			int result = tarpitService.Start();
 
 			Assert.AreEqual(100, result);
 		}
@@ -68,8 +76,7 @@ namespace Code2.Net.TcpTarpit.Tests
 		{
 			ResetSubstitutes();
 			var options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 1;
-			options.PortRangeEnd = 100;
+			options.Ports = "1-100";
 			ISocket errorListener = Substitute.For<ISocket>();
 			errorListener.When(x => x.Listen()).Do(x => { throw new Exception(); });
 			int i = 0;
@@ -87,12 +94,11 @@ namespace Code2.Net.TcpTarpit.Tests
 		{
 			ResetSubstitutes();
 			var options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 1;
-			options.PortRangeEnd = 100;
+			options.Ports = "1-100";
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
 			List<ConnectionStatus> connections = new List<ConnectionStatus>();
 			tarpitService.ConnectionCreated += (s, e) => { lock (_lock) { connections.Add(e.Connection); } };
-			
+
 			tarpitService.Start();
 			Parallel.ForEach(_asyncCallbacks, x => x.Invoke(_asyncResult));
 			tarpitService.Stop();
@@ -107,8 +113,7 @@ namespace Code2.Net.TcpTarpit.Tests
 		{
 			ResetSubstitutes();
 			var options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 1;
-			options.PortRangeEnd = 1;
+			options.Ports = "1";
 			options.WriteSize = 10;
 			options.TimeoutInSeconds = 10;
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
@@ -128,8 +133,7 @@ namespace Code2.Net.TcpTarpit.Tests
 		{
 			ResetSubstitutes();
 			var options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 1;
-			options.PortRangeEnd = 1;
+			options.Ports = "1";
 			options.WriteIntervalInMs = 10;
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
 			ConnectionStatus[] connections = default!;
@@ -150,8 +154,7 @@ namespace Code2.Net.TcpTarpit.Tests
 		{
 			ResetSubstitutes();
 			var options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 1;
-			options.PortRangeEnd = 1;
+			options.Ports = "1";
 			options.WriteIntervalInMs = 10;
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
 			ConnectionStatus[] connections = default!;
@@ -177,8 +180,7 @@ namespace Code2.Net.TcpTarpit.Tests
 			ResetSubstitutes();
 			int readerPosition = 10;
 			var options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 1;
-			options.PortRangeEnd = 1;
+			options.Ports = "1";
 			options.WriteIntervalInMs = 400;
 			options.WriteSize = 10;
 			options.UpdateIntervalInSeconds = 1;
@@ -216,7 +218,7 @@ namespace Code2.Net.TcpTarpit.Tests
 			_asyncResult = Substitute.For<IAsyncResult>();
 			_asyncResult.AsyncState.Returns(_listener);
 
-			_listener.BeginAccept(Arg.Do<AsyncCallback?>(x => { lock (_lock) { _asyncCallbacks.Add(x!); } } ), Arg.Any<object?>());
+			_listener.BeginAccept(Arg.Do<AsyncCallback?>(x => { lock (_lock) { _asyncCallbacks.Add(x!); } }), Arg.Any<object?>());
 			_listener.EndAccept(Arg.Any<IAsyncResult>()).Returns(_socket);
 			_socketFactory.CreateTcpStream().Returns(_listener);
 		}

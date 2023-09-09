@@ -49,7 +49,7 @@ namespace Code2.Net.TcpTarpit
 			}
 
 			_nextConnectionsUpdate = DateTime.Now.AddSeconds(_options.UpdateIntervalInSeconds);
-			ushort[] ports = GetPorts(_options.PortRangeBegin, _options.PortRangeEnd);
+			ushort[] ports = GetPortsFromString(_options.Ports!);
 			IPAddress listenAddress = IPAddress.Parse(_options.ListenAddress!);
 			_listeners = ports.Select(x => TryGetStartedListener(listenAddress, x))
 				.Where(x => x is not null).ToArray()!;
@@ -91,7 +91,7 @@ namespace Code2.Net.TcpTarpit
 		{
 			lock (_lock)
 			{
-				SocketConnection[] connectionsToRemove = connections.Where(x=>x.Connection.IsCompleted).ToArray();
+				SocketConnection[] connectionsToRemove = connections.Where(x => x.Connection.IsCompleted).ToArray();
 				foreach (SocketConnection connection in connectionsToRemove)
 				{
 					_connections.Remove(connection);
@@ -209,8 +209,43 @@ namespace Code2.Net.TcpTarpit
 			}
 		}
 
-		private static ushort[] GetPorts(ushort portBegin, ushort portEnd)
-			=> Enumerable.Range(portBegin, 1 + portEnd - portBegin).Select(x => (ushort)x).ToArray();
+		private ushort[] GetPortsFromString(string portsString)
+			=> portsString.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+				.SelectMany(GetPortsFromSegmentString).Where(x => x != 0).Distinct().ToArray();
+
+
+		private ushort[] GetPortsFromSegmentString(string segmentString)
+		{
+			if (segmentString.IndexOf('-') != -1)
+			{
+				ushort[] ports = segmentString.Split('-', 2, StringSplitOptions.TrimEntries).Select(GetUshortFromString).ToArray();
+				if (ports[0] > ports[1] || ports[0] == 0 || ports[1] == 0)
+				{
+					OnError(new InvalidOperationException($"Invalid port range {segmentString}"));
+					return Array.Empty<ushort>();
+				}
+				return Enumerable.Range(ports[0], 1 + ports[1] - ports[0]).Select(x => (ushort)x).ToArray();
+			}
+			else
+			{
+				ushort port = GetUshortFromString(segmentString);
+				if (port == 0)
+				{
+					OnError(new InvalidOperationException($"Invalid port {segmentString}"));
+					return Array.Empty<ushort>();
+				}
+				else
+				{
+					return new[] { port };
+				}
+			}
+		}
+
+		private ushort GetUshortFromString(string ushortString)
+		{
+			ushort n;
+			return ushort.TryParse(ushortString, out n) ? n : default;
+		}
 
 		public static string? ValidateOptions(TarpitServiceOptions options)
 		{
@@ -218,8 +253,8 @@ namespace Code2.Net.TcpTarpit
 				return $"{nameof(options.ListenAddress)} should not be null";
 			if (!IPAddress.TryParse(options.ListenAddress, out _))
 				return $"{nameof(options.ListenAddress)} is an invalid ipaddress";
-			if (options.PortRangeBegin > options.PortRangeEnd)
-				return $"{nameof(options.PortRangeEnd)} should be greater than or equal to {nameof(options.PortRangeBegin)}";
+			if (options.Ports is null)
+				return $"{nameof(options.Ports)} should be null";
 			if (options.TimeoutInSeconds <= 0)
 				return $"{nameof(options.TimeoutInSeconds)} should be greater than 0";
 			if (options.UpdateIntervalInSeconds <= 0)
@@ -235,8 +270,7 @@ namespace Code2.Net.TcpTarpit
 		public static TarpitServiceOptions GetDefaultOptions() => new()
 		{
 			ListenAddress = "0.0.0.0",
-			PortRangeBegin = 8001,
-			PortRangeEnd = 9000,
+			Ports = "8001-9000",
 			WriteIntervalInMs = 200,
 			WriteSize = 2,
 			TimeoutInSeconds = 600,

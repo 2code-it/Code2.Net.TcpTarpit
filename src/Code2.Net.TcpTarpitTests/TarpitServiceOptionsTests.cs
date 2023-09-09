@@ -1,10 +1,4 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Code2.Net.TcpTarpit;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Code2.Net.TcpTarpit.Tests
 {
@@ -46,16 +40,15 @@ namespace Code2.Net.TcpTarpit.Tests
 		}
 
 		[TestMethod]
-		public void Validate_When_PortRangeBeginIsGreaterThanPortRangeEnd_Expect_InvalidResult()
+		public void Validate_When_PortsIsNotDefined_Expect_InvalidResult()
 		{
 			TarpitServiceOptions options = TarpitService.GetDefaultOptions();
-			options.PortRangeBegin = 10;
-			options.PortRangeEnd = 9;
+			options.Ports = null;
 
 			string? result = TarpitService.ValidateOptions(options);
 
 			Assert.IsNotNull(result);
-			Assert.IsTrue(result.Contains(nameof(TarpitServiceOptions.PortRangeBegin)));
+			Assert.IsTrue(result.Contains(nameof(TarpitServiceOptions.Ports)));
 		}
 
 		[TestMethod]
