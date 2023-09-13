@@ -113,8 +113,8 @@ namespace Code2.Net.TcpTarpit
 			if (_isUpdating) return;
 			_isUpdating = true;
 
-			SocketConnection[] connections = _connections.ToArray();
-			SocketConnection[] activeConnections = _connections.Where(x => !x.Connection.IsCompleted).ToArray();
+			SocketConnection[] connections = GetConnections();
+			SocketConnection[] activeConnections = connections.Where(x => !x.Connection.IsCompleted).ToArray();
 			Parallel.ForEach(activeConnections, TrySendAndUpdate);
 
 			if (_nextConnectionsUpdate <= DateTime.Now)
@@ -123,6 +123,14 @@ namespace Code2.Net.TcpTarpit
 				_nextConnectionsUpdate = DateTime.Now.AddSeconds(_options.UpdateIntervalInSeconds);
 			}
 			_isUpdating = false;
+		}
+
+		private SocketConnection[] GetConnections()
+		{
+			lock (_lock)
+			{
+				return _connections.ToArray();
+			}
 		}
 
 		private void TrySendAndUpdate(SocketConnection sc)
