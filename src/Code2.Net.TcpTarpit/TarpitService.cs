@@ -14,9 +14,7 @@ namespace Code2.Net.TcpTarpit
 		internal TarpitService(TarpitServiceOptions options, IByteReaderFactory byteReaderFactory, ISocketFactory socketFactory)
 		{
 			_options = options;
-			_reader = options.ResponseText is null ?
-				byteReaderFactory.Create(options.ResponseFile) :
-				byteReaderFactory.Create(Encoding.UTF8.GetBytes(options.ResponseText));
+			_readerFactory = byteReaderFactory;
 			_socketFactory = socketFactory;
 		}
 
@@ -26,8 +24,9 @@ namespace Code2.Net.TcpTarpit
 		private DateTime _nextConnectionsUpdate;
 		private int _connectionId;
 		private bool _isUpdating;
+		private IByteReader _reader = default!;
 
-		private readonly IByteReader _reader;
+		private readonly IByteReaderFactory _readerFactory;
 		private readonly TarpitServiceOptions _options;
 		private readonly ISocketFactory _socketFactory;
 		private readonly IList<SocketConnection> _connections = new List<SocketConnection>();
@@ -48,6 +47,10 @@ namespace Code2.Net.TcpTarpit
 				OnError(new InvalidOperationException(validationResult), true);
 				return -1;
 			}
+
+			_reader = _options.ResponseText is null ?
+				_readerFactory.Create(_options.ResponseFile) :
+				_readerFactory.Create(Encoding.UTF8.GetBytes(_options.ResponseText));
 
 			_nextConnectionsUpdate = DateTime.Now.AddSeconds(_options.UpdateIntervalInSeconds);
 			ushort[] ports = GetPortsFromString(_options.Ports!);
