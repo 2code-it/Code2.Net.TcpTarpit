@@ -2,6 +2,7 @@
 {
 	public interface ITarpitService
 	{
+		TarpitServiceOptions Options { get; }
 		int ConnectionsCount { get; }
 		int ListenersCount { get; }
 

@@ -7,6 +7,7 @@ namespace Code2.Net.TcpTarpit
 {
 	public class TarpitService : ITarpitService
 	{
+		public TarpitService(): this(GetDefaultOptions()) { }
 		public TarpitService(TarpitServiceOptions options) : this(options, new InfiniteReaderFactory()) { }
 		public TarpitService(TarpitServiceOptions options, IByteReaderFactory byteReaderFactory)
 			: this(options, byteReaderFactory, new SocketFactory()) { }
@@ -35,7 +36,7 @@ namespace Code2.Net.TcpTarpit
 		public event EventHandler<ConnectionCreatedEventArgs>? ConnectionCreated;
 		public event EventHandler<ConnectionsUpdatedEventArgs>? ConnectionsUpdated;
 
-
+		public TarpitServiceOptions Options => _options;
 		public int ConnectionsCount => _connections.Count;
 		public int ListenersCount => _listeners?.Length ?? 0;
 
