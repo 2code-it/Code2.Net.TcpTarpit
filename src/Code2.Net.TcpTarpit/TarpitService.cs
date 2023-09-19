@@ -261,12 +261,12 @@ namespace Code2.Net.TcpTarpit
 
 		public static string? ValidateOptions(TarpitServiceOptions options)
 		{
-			if (options.ListenAddress is null)
-				return $"{nameof(options.ListenAddress)} should not be null";
+			if (string.IsNullOrEmpty(options.ListenAddress))
+				return $"{nameof(options.ListenAddress)} should not be null or empty";
 			if (!IPAddress.TryParse(options.ListenAddress, out _))
-				return $"{nameof(options.ListenAddress)} is an invalid ipaddress";
-			if (options.Ports is null)
-				return $"{nameof(options.Ports)} should be null";
+				return $"{nameof(options.ListenAddress)} is not an invalid ipaddress";
+			if (string.IsNullOrEmpty(options.Ports))
+				return $"{nameof(options.Ports)} should not be null or empty";
 			if (options.TimeoutInSeconds <= 0)
 				return $"{nameof(options.TimeoutInSeconds)} should be greater than 0";
 			if (options.UpdateIntervalInSeconds <= 0)
