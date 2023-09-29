@@ -121,7 +121,7 @@ namespace Code2.Net.TcpTarpit
 			SocketConnection[] activeConnections = connections.Where(x => !x.Connection.IsCompleted).ToArray();
 			Parallel.ForEach(activeConnections, TrySendAndUpdate);
 
-			if (_nextConnectionsUpdate <= DateTime.Now)
+			if (_nextConnectionsUpdate <= DateTime.Now && connections.Length > 0)
 			{
 				OnConnectionsUpdated(connections);
 				_nextConnectionsUpdate = DateTime.Now.AddSeconds(_options.UpdateIntervalInSeconds);
