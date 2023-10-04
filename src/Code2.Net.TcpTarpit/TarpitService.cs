@@ -44,7 +44,7 @@ namespace Code2.Net.TcpTarpit
 			string? validationResult = TarpitService.ValidateOptions(_options);
 			if (validationResult is not null)
 			{
-				OnError(new InvalidOperationException(validationResult), true);
+				OnError(validationResult, true);
 				return -1;
 			}
 
@@ -107,6 +107,9 @@ namespace Code2.Net.TcpTarpit
 			if (Error is null) throw exception;
 			Error.Invoke(this, new UnhandledExceptionEventArgs(exception, isTerminating));
 		}
+
+		private void OnError(string message, bool isTerminating = false)
+			=> OnError(new InvalidOperationException(message), isTerminating);
 
 
 		private void OnTimerConnectionUpdate(object? state)
@@ -238,7 +241,7 @@ namespace Code2.Net.TcpTarpit
 				ushort[] ports = segmentString.Split('-', 2, StringSplitOptions.TrimEntries).Select(GetUshortFromString).ToArray();
 				if (ports[0] > ports[1] || ports[0] == 0 || ports[1] == 0)
 				{
-					OnError(new InvalidOperationException($"Invalid port range {segmentString}"));
+					OnError($"Invalid port range {segmentString}");
 					return Array.Empty<ushort>();
 				}
 				return Enumerable.Range(ports[0], 1 + ports[1] - ports[0]).Select(x => (ushort)x).ToArray();
@@ -248,7 +251,7 @@ namespace Code2.Net.TcpTarpit
 				ushort port = GetUshortFromString(segmentString);
 				if (port == 0)
 				{
-					OnError(new InvalidOperationException($"Invalid port {segmentString}"));
+					OnError($"Invalid port {segmentString}");
 					return Array.Empty<ushort>();
 				}
 				else
