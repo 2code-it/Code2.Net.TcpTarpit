@@ -1,6 +1,7 @@
 ﻿using Code2.Net.TcpTarpit.Internals.Net;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
+using System;
 using System.Net;
 
 namespace Code2.Net.TcpTarpit.Tests
@@ -115,17 +116,16 @@ namespace Code2.Net.TcpTarpit.Tests
 			var options = TarpitService.GetDefaultOptions();
 			options.Ports = "1";
 			options.WriteSize = 10;
-			options.TimeoutInSeconds = 10;
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
 			ConnectionStatus connection = default!;
 			tarpitService.ConnectionCreated += (s, e) => { connection = e.Connection; };
 
-			tarpitService.Start();
+			int listenerCount = tarpitService.Start();
 			Parallel.ForEach(_asyncCallbacks, x => x.Invoke(_asyncResult));
 			tarpitService.Stop();
 
+			Assert.AreEqual(1, listenerCount);
 			Assert.AreEqual(options.WriteSize, connection.Buffer.Length);
-			Assert.AreEqual(connection.Created.AddSeconds(options.TimeoutInSeconds), connection.End);
 		}
 
 		[TestMethod]
@@ -165,7 +165,6 @@ namespace Code2.Net.TcpTarpit.Tests
 
 			tarpitService.Start();
 			Parallel.ForEach(_asyncCallbacks, x => x.Invoke(_asyncResult));
-			Thread.Sleep(100);
 			tarpitService.Stop();
 
 			_socket.Received(1).Close();

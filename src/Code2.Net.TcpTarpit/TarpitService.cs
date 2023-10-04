@@ -7,7 +7,7 @@ namespace Code2.Net.TcpTarpit
 {
 	public class TarpitService : ITarpitService
 	{
-		public TarpitService(): this(GetDefaultOptions()) { }
+		public TarpitService() : this(GetDefaultOptions()) { }
 		public TarpitService(TarpitServiceOptions options) : this(options, new InfiniteReaderFactory()) { }
 		public TarpitService(TarpitServiceOptions options, IByteReaderFactory byteReaderFactory)
 			: this(options, byteReaderFactory, new SocketFactory()) { }
@@ -73,13 +73,18 @@ namespace Code2.Net.TcpTarpit
 			OnConnectionsUpdated(connections);
 		}
 
+		public static ITarpitService Configure(Action<TarpitServiceOptions> optionsAction)
+		{
+			TarpitServiceOptions options = GetDefaultOptions();
+			optionsAction(options);
+			return new TarpitService(options);
+		}
+
 		private void CloseAndComplete(SocketConnection sc)
 		{
-			if (!sc.Connection.IsCompleted)
-			{
-				sc.Socket.Close();
-				sc.Connection.IsCompleted = true;
-			}
+			if (sc.Socket.Connected) sc.Socket.Close();
+			sc.Connection.IsCompleted = true;
+			sc.Connection.DurationInSeconds = (int)Math.Round((DateTime.Now - sc.Connection.Created).TotalSeconds);
 		}
 
 		private void OnConnectionCreated(SocketConnection socketConnection)
@@ -95,14 +100,13 @@ namespace Code2.Net.TcpTarpit
 		{
 			lock (_lock)
 			{
-				SocketConnection[] connectionsToRemove = connections.Where(x => x.Connection.IsCompleted).ToArray();
-				foreach (SocketConnection connection in connectionsToRemove)
+				SocketConnection[] completedConnections = connections.Where(x => x.Connection.IsCompleted).ToArray();
+				foreach (SocketConnection connection in completedConnections)
 				{
 					_connections.Remove(connection);
 				}
 			}
 			ConnectionsUpdated?.Invoke(this, new ConnectionsUpdatedEventArgs(connections.Select(x => x.Connection).ToArray()));
-
 		}
 
 		private void OnError(Exception exception, bool isTerminating = false)
@@ -118,8 +122,10 @@ namespace Code2.Net.TcpTarpit
 			_isUpdating = true;
 
 			SocketConnection[] connections = GetConnections();
+			Parallel.ForEach(connections, PrepareForSendingData);
+
 			SocketConnection[] activeConnections = connections.Where(x => !x.Connection.IsCompleted).ToArray();
-			Parallel.ForEach(activeConnections, TrySendAndUpdate);
+			Parallel.ForEach(activeConnections, x => { x.Connection.BytesSent += TrySendData(x); });
 
 			if (_nextConnectionsUpdate <= DateTime.Now && connections.Length > 0)
 			{
@@ -137,32 +143,39 @@ namespace Code2.Net.TcpTarpit
 			}
 		}
 
-		private void TrySendAndUpdate(SocketConnection sc)
+		private void PrepareForSendingData(SocketConnection sc)
 		{
-			sc.Connection.ReaderPosition = _reader.Read(sc.Connection.Buffer, sc.Connection.ReaderPosition);
-			sc.Connection.IsCompleted = sc.Connection.End < DateTime.Now;
-			try
-			{
-				sc.Socket.Send(sc.Connection.Buffer);
-			}
-			catch
-			{
-				sc.Connection.IsCompleted = true;
-			}
-			sc.Connection.BytesSent += sc.Connection.Buffer.Length;
-
+			sc.Connection.IsCompleted = sc.Connection.Created.AddSeconds(sc.Connection.DurationInSeconds) < DateTime.Now;
 			if (sc.Connection.IsCompleted)
 			{
-				sc.Socket.Close();
+				CloseAndComplete(sc);
+			}
+			else
+			{
+				sc.Connection.ReaderPosition = _reader.Read(sc.Connection.Buffer, sc.Connection.ReaderPosition);
 			}
 		}
 
-		private void ConnectionAdd(ISocket socket)
+		private int TrySendData(SocketConnection sc)
+		{
+			try
+			{
+				sc.Socket.Send(sc.Connection.Buffer);
+				return sc.Connection.Buffer.Length;
+			}
+			catch
+			{
+				CloseAndComplete(sc);
+			}
+			return 0;
+		}
+
+		private void CreateSocketConnection(ISocket socket)
 		{
 			socket.SendBufferSize = _options.WriteSize;
 			ConnectionStatus connection = new ConnectionStatus();
 			connection.Created = DateTime.Now;
-			connection.End = connection.Created.AddSeconds(_options.TimeoutInSeconds);
+			connection.DurationInSeconds = _options.TimeoutInSeconds;
 			connection.Buffer = new byte[_options.WriteSize];
 			connection.LocalEndPoint = socket.LocalEndPoint?.ToString()!;
 			connection.RemoteEndPoint = socket.RemoteEndPoint?.ToString()!;
@@ -197,7 +210,7 @@ namespace Code2.Net.TcpTarpit
 			try
 			{
 				ISocket client = listener.EndAccept(asyncResult);
-				ConnectionAdd(client);
+				CreateSocketConnection(client);
 			}
 			catch
 			{
