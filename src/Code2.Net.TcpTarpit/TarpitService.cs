@@ -69,7 +69,7 @@ namespace Code2.Net.TcpTarpit
 			SocketConnection[] connections = _connections.ToArray();
 			_connections.Clear();
 
-			Parallel.ForEach(connections, CloseAndComplete);
+			Parallel.ForEach(connections, x => UpdateSocketConnection(x, true));
 			OnConnectionsUpdated(connections);
 		}
 
@@ -78,13 +78,6 @@ namespace Code2.Net.TcpTarpit
 			TarpitServiceOptions options = GetDefaultOptions();
 			optionsAction(options);
 			return new TarpitService(options);
-		}
-
-		private void CloseAndComplete(SocketConnection sc)
-		{
-			if (sc.Socket.Connected) sc.Socket.Close();
-			sc.Connection.IsCompleted = true;
-			sc.Connection.DurationInSeconds = (int)Math.Round((DateTime.Now - sc.Connection.Created).TotalSeconds);
 		}
 
 		private void OnConnectionCreated(SocketConnection socketConnection)
@@ -122,10 +115,14 @@ namespace Code2.Net.TcpTarpit
 			_isUpdating = true;
 
 			SocketConnection[] connections = GetConnections();
-			Parallel.ForEach(connections, PrepareForSendingData);
+			Parallel.ForEach(connections, x => UpdateSocketConnection(x));
 
 			SocketConnection[] activeConnections = connections.Where(x => !x.Connection.IsCompleted).ToArray();
-			Parallel.ForEach(activeConnections, x => { x.Connection.BytesSent += TrySendData(x); });
+			Parallel.ForEach(activeConnections, x => {
+				x.Connection.ReaderPosition = _reader.Read(x.Connection.Buffer, x.Connection.ReaderPosition);
+				x.Connection.BytesSent += TrySendData(x); 
+			});
+			Parallel.ForEach(activeConnections, x => UpdateSocketConnection(x));
 
 			if (_nextConnectionsUpdate <= DateTime.Now && connections.Length > 0)
 			{
@@ -143,17 +140,13 @@ namespace Code2.Net.TcpTarpit
 			}
 		}
 
-		private void PrepareForSendingData(SocketConnection sc)
+		private void UpdateSocketConnection(SocketConnection sc, bool closeConnection = false)
 		{
-			sc.Connection.IsCompleted = sc.Connection.Created.AddSeconds(sc.Connection.DurationInSeconds) < DateTime.Now;
-			if (sc.Connection.IsCompleted)
-			{
-				CloseAndComplete(sc);
-			}
-			else
-			{
-				sc.Connection.ReaderPosition = _reader.Read(sc.Connection.Buffer, sc.Connection.ReaderPosition);
-			}
+			if ((sc.Connection.DurationInSeconds >= Options.TimeoutInSeconds || closeConnection) && sc.Socket.Connected) 
+				sc.Socket.Close();
+
+			sc.Connection.DurationInSeconds = (int)Math.Round((DateTime.Now - sc.Connection.Created).TotalSeconds);
+			sc.Connection.IsCompleted = !sc.Socket.Connected;
 		}
 
 		private int TrySendData(SocketConnection sc)
@@ -165,7 +158,7 @@ namespace Code2.Net.TcpTarpit
 			}
 			catch
 			{
-				CloseAndComplete(sc);
+				sc.Socket.Close();
 			}
 			return 0;
 		}
@@ -175,7 +168,6 @@ namespace Code2.Net.TcpTarpit
 			socket.SendBufferSize = _options.WriteSize;
 			ConnectionStatus connection = new ConnectionStatus();
 			connection.Created = DateTime.Now;
-			connection.DurationInSeconds = _options.TimeoutInSeconds;
 			connection.Buffer = new byte[_options.WriteSize];
 			connection.LocalEndPoint = socket.LocalEndPoint?.ToString()!;
 			connection.RemoteEndPoint = socket.RemoteEndPoint?.ToString()!;

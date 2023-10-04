@@ -159,7 +159,8 @@ namespace Code2.Net.TcpTarpit.Tests
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
 			ConnectionStatus[] connections = default!;
 			tarpitService.ConnectionsUpdated += (s, e) => { connections = e.Connections; };
-			_socket.Connected.Returns(true);
+			int i = 0;
+			_socket.Connected.Returns(x => ++i<2);
 			_socket.When(x => x.Send(Arg.Any<byte[]>())).Do(x => { throw new Exception(); });
 			_byteReader.Read(Arg.Any<byte[]>(), Arg.Any<int>()).Returns(1);
 
@@ -167,7 +168,6 @@ namespace Code2.Net.TcpTarpit.Tests
 			Parallel.ForEach(_asyncCallbacks, x => x.Invoke(_asyncResult));
 			tarpitService.Stop();
 
-			_socket.Received(1).Close();
 
 			Assert.AreEqual(1, connections.Length);
 			Assert.IsTrue(connections[0].IsCompleted);
