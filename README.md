@@ -68,7 +68,7 @@ Service started with listeners 90
 Service stopped.
 ```
 
-UseIPv4Only=false
+UseIPv4Only=true
 ```
 Service started with listeners 90
 192.168.2.23:53565       6       012345
@@ -80,7 +80,7 @@ Service stopped.
 ```
 
 ## Remarks
-Each connection has an unique id.  
+Each connection has a unique id.  
 ConnectionsUpdated event timing vary when UpdateIntervalInSeconds is not a 
 multiple of WriteIntervalInMs.  
 When the service stops it will complete active connections and send a last
