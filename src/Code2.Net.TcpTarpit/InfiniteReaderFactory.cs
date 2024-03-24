@@ -1,4 +1,6 @@
 ﻿using Code2.Net.TcpTarpit.Internals;
+using System;
+using System.Linq;
 
 namespace Code2.Net.TcpTarpit
 {
@@ -24,6 +26,9 @@ namespace Code2.Net.TcpTarpit
 
 
 		private static byte[] GetRandomBytes()
-			=> Enumerable.Range(0, 1024).Select(x => (byte)Random.Shared.Next(97, 122)).ToArray();
+		{ 
+			Random random = new Random();
+			return Enumerable.Range(0, 1024).Select(x => (byte)random.Next(97, 122)).ToArray();
+		}
 	}
 }

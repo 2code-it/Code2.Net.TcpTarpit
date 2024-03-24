@@ -1,4 +1,6 @@
-﻿namespace Code2.Net.TcpTarpit
+﻿using System;
+
+namespace Code2.Net.TcpTarpit
 {
 	public class InfiniteReader : IByteReader
 	{

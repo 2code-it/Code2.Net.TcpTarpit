@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 
 namespace Code2.Net.TcpTarpit.Internals.Net
 {
@@ -10,6 +11,7 @@ namespace Code2.Net.TcpTarpit.Internals.Net
 		}
 
 		private readonly System.Net.Sockets.Socket _socket;
+		private const int _backlogSize = 100;
 
 		public int SendBufferSize
 		{
@@ -27,7 +29,7 @@ namespace Code2.Net.TcpTarpit.Internals.Net
 			=> _socket.SetSocketOption(optionLevel, optionName, value);
 
 		public void Bind(EndPoint endPoint) => _socket.Bind(endPoint);
-		public void Listen() => _socket.Listen();
+		public void Listen() => _socket.Listen(_backlogSize);
 		public void BeginAccept(AsyncCallback? asyncCallback, object? state) => _socket.BeginAccept(asyncCallback, state);
 		public ISocket EndAccept(IAsyncResult asyncResult) => new Socket(_socket.EndAccept(asyncResult));
 		public void Dispose() => _socket.Dispose();

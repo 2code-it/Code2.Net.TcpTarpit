@@ -1,7 +1,12 @@
 ﻿using Code2.Net.TcpTarpit.Internals;
 using Code2.Net.TcpTarpit.Internals.Net;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Code2.Net.TcpTarpit
 {
@@ -18,7 +23,7 @@ namespace Code2.Net.TcpTarpit
 			_socketFactory = socketFactory;
 		}
 
-		private object _lock = new();
+		private readonly object _lock = new();
 		private ISocket[]? _listeners;
 		private Timer? _timerConnectionUpdate;
 		private DateTime _nextConnectionsUpdate;
@@ -29,7 +34,7 @@ namespace Code2.Net.TcpTarpit
 		private readonly IByteReaderFactory _readerFactory;
 		private readonly TarpitServiceOptions _options;
 		private readonly ISocketFactory _socketFactory;
-		private readonly IList<SocketConnection> _connections = new List<SocketConnection>();
+		private readonly List<SocketConnection> _connections = new List<SocketConnection>();
 
 		public event EventHandler<UnhandledExceptionEventArgs>? Error;
 		public event EventHandler<ConnectionCreatedEventArgs>? ConnectionCreated;
@@ -152,7 +157,7 @@ namespace Code2.Net.TcpTarpit
 			sc.Connection.IsCompleted = !sc.Socket.Connected;
 		}
 
-		private int TrySendData(SocketConnection sc)
+		private static int TrySendData(SocketConnection sc)
 		{
 			try
 			{
@@ -230,15 +235,17 @@ namespace Code2.Net.TcpTarpit
 		}
 
 		private ushort[] GetPortsFromString(string portsString)
-			=> portsString.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+			=> portsString.Split(',')
+				.Select(x => x.Trim())
+				.Where(x => !string.IsNullOrWhiteSpace(x))
 				.SelectMany(GetPortsFromSegmentString).Where(x => x != 0).Distinct().ToArray();
 
 
 		private ushort[] GetPortsFromSegmentString(string segmentString)
 		{
-			if (segmentString.IndexOf('-') != -1)
+			if (segmentString.Contains('-'))
 			{
-				ushort[] ports = segmentString.Split('-', 2, StringSplitOptions.TrimEntries).Select(GetUshortFromString).ToArray();
+				ushort[] ports = segmentString.Split('-').Take(2).Select(x => x.Trim()).Select(GetUshortFromString).ToArray();
 				if (ports[0] > ports[1] || ports[0] == 0 || ports[1] == 0)
 				{
 					OnError($"Invalid port range {segmentString}");
@@ -262,10 +269,8 @@ namespace Code2.Net.TcpTarpit
 		}
 
 		private ushort GetUshortFromString(string ushortString)
-		{
-			ushort n;
-			return ushort.TryParse(ushortString, out n) ? n : default;
-		}
+			=> ushort.TryParse(ushortString, out ushort n) ? n : default;
+		
 
 		public static string? ValidateOptions(TarpitServiceOptions options)
 		{

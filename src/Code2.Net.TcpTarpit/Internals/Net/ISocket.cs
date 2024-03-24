@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 
 namespace Code2.Net.TcpTarpit.Internals.Net
 {
