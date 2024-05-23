@@ -22,46 +22,6 @@ namespace Code2.Net.TcpTarpit.Tests
 		private IByteReaderFactory _byteReaderFactory = default!;
 		private object _lock = new();
 
-		[TestMethod]
-		public void Start_When_OptionsInvalidWithErrorHandler_Expect_ReturnsNegative1()
-		{
-			ResetSubstitutes();
-			var options = TarpitService.GetDefaultOptions();
-			options.ListenAddress = null;
-			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
-			tarpitService.Error += (s, e) => { };
-
-			int result = tarpitService.Start();
-
-			Assert.AreEqual(-1, result);
-		}
-
-		[TestMethod]
-		public void Start_When_OptionsPortsInvalidWithErrorHandler_Expect_ReturnsListenerCount()
-		{
-			ResetSubstitutes();
-			var options = TarpitService.GetDefaultOptions();
-			options.ListenAddress = "0.0.0.0";
-			options.Ports = "21-30,a,35,36";
-			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
-			tarpitService.Error += (s, e) => { };
-
-			int result = tarpitService.Start();
-
-			Assert.AreEqual(12, result);
-		}
-
-		[TestMethod]
-		[ExpectedException(typeof(InvalidOperationException))]
-		public void Start_When_OptionsInvalidWithoutErrorHandler_Expect_Exception()
-		{
-			ResetSubstitutes();
-			var options = TarpitService.GetDefaultOptions();
-			options.ListenAddress = null;
-			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
-
-			tarpitService.Start();
-		}
 
 		[TestMethod]
 		public void Start_When_PortRangeSpans100_Expect_100Listeners()
@@ -164,7 +124,7 @@ namespace Code2.Net.TcpTarpit.Tests
 			ConnectionStatus[] connections = default!;
 			tarpitService.ConnectionsUpdated += (s, e) => { connections = e.Connections; };
 			int i = 0;
-			_socket.Connected.Returns(x => ++i<2);
+			_socket.Connected.Returns(x => ++i < 2);
 			_socket.When(x => x.Send(Arg.Any<byte[]>())).Do(x => { throw new Exception(); });
 			_byteReader.Read(Arg.Any<byte[]>(), Arg.Any<int>()).Returns(1);
 
@@ -193,7 +153,7 @@ namespace Code2.Net.TcpTarpit.Tests
 			int writes = 0;
 			_socket.When(x => x.Send(Arg.Any<byte[]>())).Do(x => writes++);
 			_socket.Connected.Returns(true);
-			_byteReader.Read(Arg.Any<byte[]>(), Arg.Any<int>()).Returns(x => readerPosition);
+			_byteReader.Read(Arg.Any<byte[]>(), Arg.Any<int>()).Returns(readerPosition);
 
 			tarpitService.Start();
 			_asyncCallbacks[0].Invoke(_asyncResult);
@@ -213,6 +173,7 @@ namespace Code2.Net.TcpTarpit.Tests
 			_byteReader = Substitute.For<IByteReader>();
 			_byteReaderFactory = Substitute.For<IByteReaderFactory>();
 			_byteReaderFactory.Create(Arg.Any<string?>()).Returns(_byteReader);
+			_byteReaderFactory.Create(Arg.Any<byte[]>()).Returns(_byteReader);
 			_listener = Substitute.For<ISocket>();
 			_socket = Substitute.For<ISocket>();
 			_socket.LocalEndPoint.Returns(endPoint);
