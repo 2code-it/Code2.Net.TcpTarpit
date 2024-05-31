@@ -28,22 +28,13 @@ namespace Code2.Net.TcpTarpit.Tests
 		}
 
 		[TestMethod]
-		public void Validate_When_ListenAddressIsNull_Expect_InvalidResult()
+		[DataRow("5-1")]
+		[DataRow("5-,1")]
+		[DataRow("0")]
+		public void Validate_When_PortsIsInvalid_Expect_InvalidResult(string ports)
 		{
 			TarpitServiceOptions options = TarpitService.GetDefaultOptions();
-			options.ListenAddress = null;
-
-			string? result = TarpitService.ValidateOptions(options);
-
-			Assert.IsNotNull(result);
-			Assert.IsTrue(result.Contains(nameof(TarpitServiceOptions.ListenAddress)));
-		}
-
-		[TestMethod]
-		public void Validate_When_PortsIsNotDefined_Expect_InvalidResult()
-		{
-			TarpitServiceOptions options = TarpitService.GetDefaultOptions();
-			options.Ports = null;
+			options.Ports = "5-1";
 
 			string? result = TarpitService.ValidateOptions(options);
 
