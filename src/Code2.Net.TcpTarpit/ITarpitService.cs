@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Code2.Net.TcpTarpit
 {
@@ -14,5 +15,9 @@ namespace Code2.Net.TcpTarpit
 
 		int Start();
 		void Stop();
+		ConnectionStatus[] GetCurrentConnections();
+		void AddListeners(IEnumerable<ushort> ports);
+		void AddListener(ushort port);
+		void RemoveListener(ushort port);
 	}
 }

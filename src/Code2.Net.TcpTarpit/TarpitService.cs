@@ -24,7 +24,7 @@ namespace Code2.Net.TcpTarpit
 		}
 
 		private readonly object _lock = new();
-		private ISocket[]? _listeners;
+		private readonly Dictionary<ushort, ISocket> _listeners = new Dictionary<ushort, ISocket>();
 		private Timer? _timerConnectionUpdate;
 		private DateTime _nextConnectionsUpdate;
 		private int _connectionId;
@@ -42,7 +42,8 @@ namespace Code2.Net.TcpTarpit
 
 		public TarpitServiceOptions Options => _options;
 		public int ConnectionsCount => _connections.Count;
-		public int ListenersCount => _listeners?.Length ?? 0;
+		public int ListenersCount => _listeners?.Count ?? 0;
+		
 
 		public int Start()
 		{
@@ -52,23 +53,52 @@ namespace Code2.Net.TcpTarpit
 
 			_nextConnectionsUpdate = DateTime.Now.AddSeconds(_options.UpdateIntervalInSeconds!.Value);
 			ushort[] ports = GetPortsFromString(_options.Ports!);
-			IPAddress listenAddress = IPAddress.Parse(_options.ListenAddress!);
-			_listeners = ports.Select(x => TryGetStartedListener(listenAddress, x))
-				.Where(x => x is not null).ToArray()!;
+			AddListeners(ports);
 			_timerConnectionUpdate = new Timer(new TimerCallback(OnTimerConnectionUpdate), null, 0, _options.WriteIntervalInMs!.Value);
-			return _listeners.Length;
+			return _listeners.Count;
 		}
 
 		public void Stop()
 		{
 			_timerConnectionUpdate?.Dispose();
-			Parallel.ForEach(_listeners!, x => x.Dispose());
-			_listeners = null;
+			Parallel.ForEach(_listeners.Values, x => x.Dispose());
+			_listeners.Clear();
 			SocketConnection[] connections = _connections.ToArray();
 			_connections.Clear();
 
 			Parallel.ForEach(connections, x => UpdateSocketConnection(x, true));
 			OnConnectionsUpdated(connections);
+		}
+
+		public ConnectionStatus[] GetCurrentConnections()
+			=> GetConnections().Select(x => x.Connection).ToArray();
+
+		public void CloseConnection(int connectionId)
+		{
+			var connection = _connections.FirstOrDefault(x => x.Id == connectionId);
+			if (connection is null) return;
+			UpdateSocketConnection(connection, true);
+		}
+
+		public void RemoveListener(ushort port)
+		{
+			if (!_listeners.ContainsKey(port)) return;
+			_listeners[port].Dispose();
+			_listeners.Remove(port);
+		}
+
+		public void AddListener(ushort port)
+			=> AddListeners(new[] { port });
+
+		public void AddListeners(IEnumerable<ushort> ports)
+		{
+			IPAddress listenAddress = IPAddress.Parse(_options.ListenAddress!);
+			foreach (var port in ports)
+			{
+				var listener  = TryGetStartedListener(listenAddress, port);
+				if (listener is null) continue;
+				_listeners.Add(port, listener);
+			}
 		}
 
 		public void Configure(Action<TarpitServiceOptions> optionsAction)
