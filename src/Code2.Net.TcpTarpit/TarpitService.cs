@@ -91,8 +91,16 @@ namespace Code2.Net.TcpTarpit
 			if (options.WriteSize.HasValue) _options.WriteSize = options.WriteSize.Value;
 			if (options.UpdateIntervalInSeconds.HasValue) _options.UpdateIntervalInSeconds = options.UpdateIntervalInSeconds.Value;
 			if (options.TimeoutInSeconds.HasValue) _options.TimeoutInSeconds = options.TimeoutInSeconds.Value;
-			if (options.ResponseFile is not null) _options.ResponseFile = options.ResponseFile;
-			if (options.ResponseText is not null) _options.ResponseText = options.ResponseText;
+			if (options.ResponseFile is not null)
+			{
+				_options.ResponseFile = options.ResponseFile;
+				_options.ResponseText = null;
+			}
+			if (options.ResponseText is not null)
+			{
+				_options.ResponseText = options.ResponseText;
+				_options.ResponseFile = null;
+			}
 		}
 
 		private void OnConnectionCreated(SocketConnection socketConnection)
