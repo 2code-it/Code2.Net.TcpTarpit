@@ -80,6 +80,7 @@ namespace Code2.Net.TcpTarpit.Tests
 			var options = TarpitService.GetDefaultOptions();
 			options.Ports = "1";
 			options.WriteSize = 10;
+			options.SendTimeoutInMs = 3000;
 			TarpitService tarpitService = new TarpitService(options, _byteReaderFactory, _socketFactory);
 			ConnectionStatus connection = default!;
 			tarpitService.ConnectionCreated += (s, e) => { connection = e.Connection; };
@@ -89,7 +90,8 @@ namespace Code2.Net.TcpTarpit.Tests
 			tarpitService.Stop();
 
 			Assert.AreEqual(1, listenerCount);
-			Assert.AreEqual(options.WriteSize, connection.Buffer.Length);
+			Assert.AreEqual(options.WriteSize, _socket.SendBufferSize);
+			Assert.AreEqual(options.SendTimeoutInMs, _socket.SendTimeout);
 		}
 
 		[TestMethod]
@@ -162,7 +164,6 @@ namespace Code2.Net.TcpTarpit.Tests
 
 			Assert.AreEqual(1, connections.Length);
 			Assert.AreEqual(options.WriteSize * writes, connections[0].BytesSent);
-			Assert.AreEqual(readerPosition, connections[0].ReaderPosition);
 		}
 
 

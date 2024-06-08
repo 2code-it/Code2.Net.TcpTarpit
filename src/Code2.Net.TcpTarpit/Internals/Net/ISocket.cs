@@ -6,6 +6,7 @@ namespace Code2.Net.TcpTarpit.Internals.Net
 	internal interface ISocket
 	{
 		int SendBufferSize { get; set; }
+		int SendTimeout { get; set; }
 		EndPoint? LocalEndPoint { get; }
 		EndPoint? RemoteEndPoint { get; }
 		bool Connected { get; }

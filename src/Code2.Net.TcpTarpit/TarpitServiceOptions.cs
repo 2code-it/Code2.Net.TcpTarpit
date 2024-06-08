@@ -9,6 +9,7 @@
 		public int? WriteSize { get; set; }
 		public int? UpdateIntervalInSeconds { get; set; }
 		public int? TimeoutInSeconds { get; set; }
+		public int? SendTimeoutInMs { get; set; }
 		public string? ResponseFile { get; set; }
 		public string? ResponseText { get; set; }
 	}

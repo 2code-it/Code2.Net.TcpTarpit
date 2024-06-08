@@ -18,6 +18,12 @@ namespace Code2.Net.TcpTarpit.Internals.Net
 			get => _socket.SendBufferSize;
 			set => _socket.SendBufferSize = value;
 		}
+
+		public int SendTimeout
+		{
+			get => _socket.SendTimeout;
+			set => _socket.SendTimeout = value;
+		}
 		public EndPoint? LocalEndPoint => _socket.LocalEndPoint;
 		public EndPoint? RemoteEndPoint => _socket.RemoteEndPoint;
 		public bool Connected => _socket.Connected;

@@ -1,5 +1,4 @@
-﻿using Code2.Net.TcpTarpit.Internals;
-using Code2.Net.TcpTarpit.Internals.Net;
+﻿using Code2.Net.TcpTarpit.Internals.Net;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,7 +33,7 @@ namespace Code2.Net.TcpTarpit
 		private readonly IByteReaderFactory _readerFactory;
 		private readonly TarpitServiceOptions _options = GetDefaultOptions();
 		private readonly ISocketFactory _socketFactory;
-		private readonly List<SocketConnection> _connections = new List<SocketConnection>();
+		private readonly List<TarpitConnection> _connections = new List<TarpitConnection>();
 
 		public event EventHandler<UnhandledExceptionEventArgs>? Error;
 		public event EventHandler<ConnectionCreatedEventArgs>? ConnectionCreated;
@@ -43,7 +42,7 @@ namespace Code2.Net.TcpTarpit
 		public TarpitServiceOptions Options => _options;
 		public int ConnectionsCount => _connections.Count;
 		public int ListenersCount => _listeners?.Count ?? 0;
-		
+
 
 		public int Start()
 		{
@@ -63,21 +62,19 @@ namespace Code2.Net.TcpTarpit
 			_timerConnectionUpdate?.Dispose();
 			Parallel.ForEach(_listeners.Values, x => x.Dispose());
 			_listeners.Clear();
-			SocketConnection[] connections = _connections.ToArray();
+			TarpitConnection[] connections = _connections.ToArray();
 			_connections.Clear();
 
-			Parallel.ForEach(connections, x => UpdateSocketConnection(x, true));
+			Parallel.ForEach(connections, x => x.Close());
 			OnConnectionsUpdated(connections);
 		}
 
 		public ConnectionStatus[] GetCurrentConnections()
-			=> GetConnections().Select(x => x.Connection).ToArray();
+			=> GetConnections().Select(x => x.Status).ToArray();
 
 		public void CloseConnection(int connectionId)
 		{
-			var connection = _connections.FirstOrDefault(x => x.Id == connectionId);
-			if (connection is null) return;
-			UpdateSocketConnection(connection, true);
+			_connections.FirstOrDefault(x => x.Id == connectionId)?.Close();
 		}
 
 		public void RemoveListener(ushort port)
@@ -95,7 +92,7 @@ namespace Code2.Net.TcpTarpit
 			IPAddress listenAddress = IPAddress.Parse(_options.ListenAddress!);
 			foreach (var port in ports)
 			{
-				var listener  = TryGetStartedListener(listenAddress, port);
+				var listener = TryGetStartedListener(listenAddress, port);
 				if (listener is null) continue;
 				_listeners.Add(port, listener);
 			}
@@ -121,6 +118,7 @@ namespace Code2.Net.TcpTarpit
 			if (options.WriteSize.HasValue) _options.WriteSize = options.WriteSize.Value;
 			if (options.UpdateIntervalInSeconds.HasValue) _options.UpdateIntervalInSeconds = options.UpdateIntervalInSeconds.Value;
 			if (options.TimeoutInSeconds.HasValue) _options.TimeoutInSeconds = options.TimeoutInSeconds.Value;
+			if (options.SendTimeoutInMs.HasValue) _options.SendTimeoutInMs = options.SendTimeoutInMs.Value;
 			if (options.ResponseFile is not null)
 			{
 				_options.ResponseFile = options.ResponseFile;
@@ -133,26 +131,26 @@ namespace Code2.Net.TcpTarpit
 			}
 		}
 
-		private void OnConnectionCreated(SocketConnection socketConnection)
+		private void OnConnectionCreated(TarpitConnection connection)
 		{
 			lock (_lock)
 			{
-				_connections.Add(socketConnection);
+				_connections.Add(connection);
 			}
-			ConnectionCreated?.Invoke(this, new ConnectionCreatedEventArgs(socketConnection.Connection));
+			ConnectionCreated?.Invoke(this, new ConnectionCreatedEventArgs(connection.Status));
 		}
 
-		private void OnConnectionsUpdated(SocketConnection[] connections)
+		private void OnConnectionsUpdated(TarpitConnection[] connections)
 		{
 			lock (_lock)
 			{
-				SocketConnection[] completedConnections = connections.Where(x => x.Connection.IsCompleted).ToArray();
-				foreach (SocketConnection connection in completedConnections)
+				TarpitConnection[] completedConnections = connections.Where(x => x.Status.IsCompleted).ToArray();
+				foreach (TarpitConnection connection in completedConnections)
 				{
 					_connections.Remove(connection);
 				}
 			}
-			ConnectionsUpdated?.Invoke(this, new ConnectionsUpdatedEventArgs(connections.Select(x => x.Connection).ToArray()));
+			ConnectionsUpdated?.Invoke(this, new ConnectionsUpdatedEventArgs(connections.Select(x => x.Status).ToArray()));
 		}
 
 		private void OnError(Exception exception, bool isTerminating = false)
@@ -170,16 +168,10 @@ namespace Code2.Net.TcpTarpit
 			if (_isUpdating) return;
 			_isUpdating = true;
 
-			SocketConnection[] connections = GetConnections();
-			Parallel.ForEach(connections, x => UpdateSocketConnection(x));
-
-			SocketConnection[] activeConnections = connections.Where(x => !x.Connection.IsCompleted).ToArray();
-			Parallel.ForEach(activeConnections, x =>
-			{
-				x.Connection.ReaderPosition = _reader.Read(x.Connection.Buffer, x.Connection.ReaderPosition);
-				x.Connection.BytesSent += TrySendData(x);
-			});
-			Parallel.ForEach(activeConnections, x => UpdateSocketConnection(x));
+			TarpitConnection[] connections = GetConnections();
+			Parallel.ForEach(connections, x => x.Update());
+			TarpitConnection[] activeConnections = connections.Where(x => !x.Status.IsCompleted).ToArray();
+			Parallel.ForEach(connections, x => x.Send());
 
 			if (_nextConnectionsUpdate <= DateTime.Now && connections.Length > 0)
 			{
@@ -189,7 +181,7 @@ namespace Code2.Net.TcpTarpit
 			_isUpdating = false;
 		}
 
-		private SocketConnection[] GetConnections()
+		private TarpitConnection[] GetConnections()
 		{
 			lock (_lock)
 			{
@@ -197,39 +189,15 @@ namespace Code2.Net.TcpTarpit
 			}
 		}
 
-		private void UpdateSocketConnection(SocketConnection sc, bool closeConnection = false)
-		{
-			if ((sc.Connection.DurationInSeconds >= Options.TimeoutInSeconds || closeConnection) && sc.Socket.Connected)
-				sc.Socket.Close();
-
-			sc.Connection.DurationInSeconds = (int)Math.Round((DateTime.Now - sc.Connection.Created).TotalSeconds);
-			sc.Connection.IsCompleted = !sc.Socket.Connected;
-		}
-
-		private static int TrySendData(SocketConnection sc)
-		{
-			try
-			{
-				sc.Socket.Send(sc.Connection.Buffer);
-				return sc.Connection.Buffer.Length;
-			}
-			catch
-			{
-				sc.Socket.Close();
-			}
-			return 0;
-		}
-
 		private void CreateSocketConnection(ISocket socket)
 		{
 			socket.SendBufferSize = _options.WriteSize!.Value;
-			ConnectionStatus connection = new ConnectionStatus();
-			connection.Created = DateTime.Now;
-			connection.Buffer = new byte[_options.WriteSize.Value];
-			connection.LocalEndPoint = socket.LocalEndPoint?.ToString()!;
-			connection.RemoteEndPoint = socket.RemoteEndPoint?.ToString()!;
+			socket.SendTimeout = _options.SendTimeoutInMs!.Value;
+			TarpitConnection connection = new TarpitConnection(socket, _reader, _options.TimeoutInSeconds!.Value);
+			connection.Status.LocalEndPoint = socket.LocalEndPoint?.ToString()!;
+			connection.Status.RemoteEndPoint = socket.RemoteEndPoint?.ToString()!;
 			connection.Id = GetNextConnectionId();
-			OnConnectionCreated(new SocketConnection(socket, connection));
+			OnConnectionCreated(connection);
 		}
 
 		private ISocket? TryGetStartedListener(IPAddress ipAddress, ushort port)
@@ -368,6 +336,7 @@ namespace Code2.Net.TcpTarpit
 			WriteIntervalInMs = 200,
 			WriteSize = 2,
 			TimeoutInSeconds = 600,
+			SendTimeoutInMs = 2000,
 			UpdateIntervalInSeconds = 5,
 			ResponseText = "HTTP/1.1 200 OK\r\nServer: nginx\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: keep-alive\r\n\r\n00000000 00000000 00000000 00000000 00000000 00000000"
 		};
