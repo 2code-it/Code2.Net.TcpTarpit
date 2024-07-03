@@ -15,6 +15,9 @@ namespace Code2.Net.TcpTarpit
 
 		int Start();
 		void Stop();
+		void Configure(Action<TarpitServiceOptions> optionsAction);
+		void Configure(TarpitServiceOptions options);
+
 		ConnectionStatus[] GetCurrentConnections();
 		void AddListeners(IEnumerable<ushort> ports);
 		void AddListener(ushort port);
